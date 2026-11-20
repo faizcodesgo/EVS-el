@@ -3,12 +3,23 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../services/api'
 
 const initialForm = { name: '', location: '', waterType: 'Pond' }
+const parameterFields = [
+  { key: 'temperature', label: 'Temperature', unit: '°C' },
+  { key: 'pH', label: 'pH', unit: '' },
+  { key: 'salinity', label: 'Salinity', unit: 'sensor unit' },
+  { key: 'ammonia', label: 'Ammonia (TAN-N)', unit: 'mg/L' }
+]
+
+function emptyLimits() {
+  return Object.fromEntries(parameterFields.map(({ key }) => [key, { enabled: false, min: '', max: '' }]))
+}
 
 function RegisterWaterBody() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('edit')
   const [form, setForm] = useState(initialForm)
+  const [monitoringLimits, setMonitoringLimits] = useState(emptyLimits)
   const [loading, setLoading] = useState(Boolean(editId))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -26,6 +37,11 @@ function RegisterWaterBody() {
           return
         }
         setForm({ name: body.name, location: body.location || '', waterType: body.waterType })
+        setMonitoringLimits(Object.fromEntries(parameterFields.map(({ key }) => [key, {
+          enabled: Boolean(body.monitoringLimits?.[key]?.enabled),
+          min: body.monitoringLimits?.[key]?.min ?? '',
+          max: body.monitoringLimits?.[key]?.max ?? ''
+        }])))
       })
       .catch((requestError) => {
         if (!controller.signal.aborted) {
@@ -44,6 +60,13 @@ function RegisterWaterBody() {
     setForm((current) => ({ ...current, [name]: value }))
   }
 
+  function handleLimitChange(key, field, value) {
+    setMonitoringLimits((current) => ({
+      ...current,
+      [key]: { ...current[key], [field]: field === 'enabled' ? value : value }
+    }))
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
@@ -57,7 +80,12 @@ function RegisterWaterBody() {
       const payload = {
         name: form.name.trim(),
         location: form.location.trim(),
-        waterType: form.waterType
+        waterType: form.waterType,
+        monitoringLimits: Object.fromEntries(parameterFields.map(({ key }) => [key, {
+          enabled: monitoringLimits[key].enabled,
+          ...(monitoringLimits[key].min !== '' && monitoringLimits[key].max !== ''
+            ? { min: Number(monitoringLimits[key].min), max: Number(monitoringLimits[key].max) } : {})
+        }]))
       }
       if (editId) {
         await api.put(`/water-bodies/${encodeURIComponent(editId)}`, payload)
@@ -100,6 +128,19 @@ function RegisterWaterBody() {
             <option value="Fish Farm">Fish Farm</option>
             <option value="Other">Other</option>
           </select>
+
+          <fieldset className="limits-fieldset">
+            <legend>User-configured monitoring limits</legend>
+            <p className="form-help">Limits are configured by you. HydroGen does not apply default environmental thresholds.</p>
+            <p className="form-help">Changes to limits are applied to active alerts when the next valid reading arrives. TAN-N is not un-ionized NH₃; the salinity unit is not established by the sensor contract.</p>
+            {parameterFields.map(({ key, label, unit }) => (
+              <div className="limit-row" key={key}>
+                <label className="limit-enable"><input type="checkbox" checked={monitoringLimits[key].enabled} onChange={(event) => handleLimitChange(key, 'enabled', event.target.checked)} />{label}{unit ? ` (${unit})` : ''}</label>
+                <label className="field-group"><span>Minimum</span><input type="number" step="any" value={monitoringLimits[key].min} onChange={(event) => handleLimitChange(key, 'min', event.target.value)} /></label>
+                <label className="field-group"><span>Maximum</span><input type="number" step="any" value={monitoringLimits[key].max} onChange={(event) => handleLimitChange(key, 'max', event.target.value)} /></label>
+              </div>
+            ))}
+          </fieldset>
 
           {error && <p className="inline-error" role="alert">{error}</p>}
           <div className="form-actions">

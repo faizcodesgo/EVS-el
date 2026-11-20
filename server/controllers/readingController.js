@@ -3,7 +3,7 @@ const Reading = require('../models/Reading')
 
 const OBJECT_ID_PATTERN = /^[a-f\d]{24}$/i
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?$/i
-const READING_FIELDS = 'deviceId waterBodyId ammonia temperature salinity pH recordedAt'
+const READING_FIELDS = 'deviceId waterBodyId ammonia temperature salinity pH recordedAt dataSource simulationSessionId'
 
 function parseIsoDate(value) {
   if (typeof value !== 'string' || !ISO_DATE_PATTERN.test(value)) return null
@@ -23,7 +23,10 @@ function parseIsoDate(value) {
 }
 
 async function getReadings(req, res) {
-  const { waterBodyId, from, to, page: pageValue, limit: limitValue } = req.query
+  const { waterBodyId, from, to, page: pageValue, limit: limitValue, dataSource } = req.query
+  if (dataSource !== undefined && !['real', 'simulation'].includes(dataSource)) {
+    return res.status(400).json({ success: false, message: 'dataSource must be real or simulation' })
+  }
 
   if (typeof waterBodyId !== 'string' || !waterBodyId.trim()) {
     return res.status(400).json({
@@ -89,6 +92,10 @@ async function getReadings(req, res) {
     }
 
     const filter = { waterBodyId: waterBody._id }
+    if (dataSource === 'simulation') filter.dataSource = 'simulation'
+    if (dataSource === 'real') {
+      filter.$or = [{ dataSource: 'real' }, { dataSource: { $exists: false } }]
+    }
     if (fromDate || toDate) {
       filter.recordedAt = {}
       if (fromDate) filter.recordedAt.$gte = fromDate
@@ -107,7 +114,11 @@ async function getReadings(req, res) {
 
     return res.json({
       success: true,
-      readings,
+      readings: readings.map((reading) => ({
+        ...reading,
+        dataSource: reading.dataSource || 'real',
+        simulationSessionId: reading.simulationSessionId || null
+      })),
       page,
       pageSize: limit,
       total,

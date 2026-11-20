@@ -5,6 +5,9 @@ const express = require('express')
 const http = require('node:http')
 const Device = require('../models/Device')
 const Reading = require('../models/Reading')
+const WaterBody = require('../models/WaterBody')
+const Alert = require('../models/Alert')
+const AlertEvaluationState = require('../models/AlertEvaluationState')
 const deviceIngressRoutes = require('../routes/deviceIngressRoutes')
 const receiveTelemetry = require('../controllers/telemetryController')
 
@@ -61,6 +64,16 @@ function responseRecorder() {
   }
 }
 
+function mockAlertEvaluation(t) {
+  t.mock.method(AlertEvaluationState, 'findOne', async () => null)
+  t.mock.method(AlertEvaluationState.prototype, 'save', async function save() { this._id = this._id || 'state-id'; return this })
+  t.mock.method(Alert, 'findOne', async () => null)
+}
+
+function mockWaterBody(t, id = 'aaaaaaaaaaaaaaaaaaaaaaaa') {
+  t.mock.method(WaterBody, 'findById', () => ({ select: async () => ({ _id: id, userId: 'bbbbbbbbbbbbbbbbbbbbbbbb' }) }))
+}
+
 test('authenticated telemetry is saved with authenticated identity, sensor values and server time', async (t) => {
   const credential = 'telemetry-secret'
   const device = makeDevice(credential)
@@ -70,6 +83,8 @@ test('authenticated telemetry is saved with authenticated identity, sensor value
     savedReading = document
     return document
   })
+  mockWaterBody(t, device.waterBodyId)
+  mockAlertEvaluation(t)
   const baseUrl = await startTestServer(t)
 
   const beforeRequest = Date.now()
@@ -95,7 +110,10 @@ test('authenticated telemetry is saved with authenticated identity, sensor value
     pH: 7.2,
     salinity: 0.4,
     ammonia: 0.08,
-    recordedAt: savedReading.recordedAt
+    recordedAt: savedReading.recordedAt,
+    dataSource: 'real',
+    simulationSessionId: null,
+    userId: undefined
   })
   assert.ok(savedReading.recordedAt instanceof Date)
   assert.ok(savedReading.recordedAt.getTime() >= beforeRequest)
@@ -159,6 +177,8 @@ test('telemetry validation rejects missing, non-numeric, non-finite and out-of-r
 })
 
 test('telemetry persistence failure returns 500 instead of success', async (t) => {
+  mockWaterBody(t)
+  mockAlertEvaluation(t)
   t.mock.method(Reading, 'create', async () => {
     throw new Error('private database failure detail')
   })
@@ -175,6 +195,8 @@ test('telemetry persistence failure returns 500 instead of success', async (t) =
 })
 
 test('telemetry accepts boundary values and ignores unsupported extra fields', async (t) => {
+  mockWaterBody(t)
+  mockAlertEvaluation(t)
   t.mock.method(Reading, 'create', async (document) => document)
   const res = responseRecorder()
   await receiveTelemetry({

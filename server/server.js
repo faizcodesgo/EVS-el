@@ -10,6 +10,8 @@ const waterBodyRoutes = require('./routes/waterBodyRoutes')
 const deviceRoutes = require('./routes/deviceRoutes')
 const deviceIngressRoutes = require('./routes/deviceIngressRoutes')
 const readingRoutes = require('./routes/readingRoutes')
+const alertRoutes = require('./routes/alertRoutes')
+const simulationRoutes = require('./routes/simulationRoutes')
 const app = express()
 
 app.use(cors({
@@ -24,6 +26,8 @@ app.use('/api/water-bodies', waterBodyRoutes)
 app.use('/api/devices', deviceRoutes)
 app.use('/api/device', deviceIngressRoutes)
 app.use('/api/readings', readingRoutes)
+app.use('/api/alerts', alertRoutes)
+app.use('/api/simulations', simulationRoutes)
 app.use('/api/water-bodies', waterBodyRoutes)
 app.get('/api/health', (req, res) => {
   res.json({
@@ -36,6 +40,7 @@ const PORT = process.env.PORT || 5000
 
 async function startServer() {
   await connectDB()
+  await require('./services/simulationService').interruptRunningSessions()
 
   app.listen(PORT, () => {
     console.log(`HydroGen server running on http://localhost:${PORT}`)

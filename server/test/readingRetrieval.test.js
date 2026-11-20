@@ -116,7 +116,19 @@ test('authenticated user retrieves own water body readings with pagination metad
   assert.equal(response.body.totalPages, 1)
   assert.deepEqual(inspect().waterBodyQuery, { _id: WATER_BODY_ID, userId: USER_ID })
   assert.deepEqual(inspect().readingFilter, { waterBodyId: WATER_BODY_ID })
-  assert.equal(inspect().selectedFields, 'deviceId waterBodyId ammonia temperature salinity pH recordedAt')
+  assert.equal(inspect().selectedFields, 'deviceId waterBodyId ammonia temperature salinity pH recordedAt dataSource simulationSessionId')
+})
+
+test('real source filter includes legacy readings without source metadata', async (t) => {
+  const inspect = mockDatabase(t, { records: [makeReading(1)] })
+  const baseUrl = await startServer(t)
+  const response = await getJson(baseUrl, `waterBodyId=${WATER_BODY_ID}&dataSource=real`)
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(inspect().readingFilter, {
+    waterBodyId: WATER_BODY_ID,
+    $or: [{ dataSource: 'real' }, { dataSource: { $exists: false } }]
+  })
 })
 
 test('user cannot retrieve readings for a water body they do not own', async (t) => {

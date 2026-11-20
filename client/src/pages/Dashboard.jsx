@@ -10,6 +10,7 @@ import {
   YAxis
 } from 'recharts'
 import api from '../services/api'
+import SimulationPanel from '../components/SimulationPanel'
 import { getReferenceLabel, getReferenceStatus } from '../config/parameterReferences'
 
 const PAGE_LIMIT = 100
@@ -189,10 +190,12 @@ function Dashboard() {
   const [directoryError, setDirectoryError] = useState('')
   const [deviceError, setDeviceError] = useState('')
   const [preset, setPreset] = useState('7d')
+  const [dataSource, setDataSource] = useState('real')
   const [customFrom, setCustomFrom] = useState(() => localDateValue(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)))
   const [customTo, setCustomTo] = useState(() => localDateValue(new Date()))
-  const [latestResult, setLatestResult] = useState({ waterBodyId: '', reading: null, error: '' })
+  const [latestResult, setLatestResult] = useState({ key: '', reading: null, error: '' })
   const [historyResult, setHistoryResult] = useState({ key: '', readings: [], total: 0, error: '' })
+  const [refreshVersion, setRefreshVersion] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -239,10 +242,10 @@ function Dashboard() {
   const customRangeInvalid = preset === 'custom' && customFrom && customTo && customFrom > customTo
   const selectedWaterBody = waterBodies.find((body) => String(body._id) === String(selectedWaterBodyId))
   const latestKey = selectedWaterBodyId && selectedWaterBody && !directoryLoading && !directoryError
-    ? selectedWaterBodyId
+    ? `${selectedWaterBodyId}|${dataSource}|${refreshVersion}`
     : ''
   const queryKey = selectedWaterBodyId && selectedWaterBody && !directoryLoading && !directoryError && dateRange && !customRangeInvalid
-    ? `${selectedWaterBodyId}|${dateRange.from}|${dateRange.to}`
+    ? `${selectedWaterBodyId}|${dateRange.from}|${dateRange.to}|${dataSource}|${refreshVersion}`
     : ''
 
   useEffect(() => {
@@ -250,13 +253,13 @@ function Dashboard() {
     const controller = new AbortController()
 
     api.get('/readings', {
-      params: { waterBodyId: selectedWaterBodyId, page: 1, limit: 1 },
+      params: { waterBodyId: selectedWaterBodyId, page: 1, limit: 1, ...(dataSource ? { dataSource } : {}) },
       signal: controller.signal
     })
       .then((response) => {
         if (!controller.signal.aborted) {
           setLatestResult({
-            waterBodyId: selectedWaterBodyId,
+            key: latestKey,
             reading: response.data.readings?.[0] || null,
             error: ''
           })
@@ -265,7 +268,7 @@ function Dashboard() {
       .catch((error) => {
         if (!controller.signal.aborted) {
           setLatestResult({
-            waterBodyId: selectedWaterBodyId,
+            key: latestKey,
             reading: null,
             error: error.response?.data?.message || 'Could not load the latest stored reading.'
           })
@@ -273,7 +276,15 @@ function Dashboard() {
       })
 
     return () => controller.abort()
-  }, [latestKey, selectedWaterBodyId])
+  }, [latestKey, selectedWaterBodyId, dataSource])
+
+  useEffect(() => {
+    const refresh = () => {
+      setRefreshVersion((value) => value + 1)
+    }
+    window.addEventListener('hydrogen-readings-updated', refresh)
+    return () => window.removeEventListener('hydrogen-readings-updated', refresh)
+  }, [])
 
   useEffect(() => {
     if (!queryKey || !dateRange) return undefined
@@ -281,7 +292,7 @@ function Dashboard() {
 
     async function loadReadings() {
       try {
-        const params = { waterBodyId: selectedWaterBodyId, from: dateRange.from, to: dateRange.to, page: 1, limit: PAGE_LIMIT }
+        const params = { waterBodyId: selectedWaterBodyId, from: dateRange.from, to: dateRange.to, page: 1, limit: PAGE_LIMIT, ...(dataSource ? { dataSource } : {}) }
         const firstPage = await api.get('/readings', { params, signal: controller.signal })
         const pages = [firstPage.data.readings || []]
         const totalPages = firstPage.data.totalPages || 0
@@ -315,10 +326,10 @@ function Dashboard() {
 
     loadReadings()
     return () => controller.abort()
-  }, [queryKey, selectedWaterBodyId, dateRange])
+  }, [queryKey, selectedWaterBodyId, dateRange, dataSource])
 
   const assignedDevice = getSelectedDevice(devices, selectedWaterBodyId)
-  const latestMatchesSelection = Boolean(latestKey && latestResult.waterBodyId === selectedWaterBodyId)
+  const latestMatchesSelection = Boolean(latestKey && latestResult.key === latestKey)
   const latestReading = latestMatchesSelection ? latestResult.reading : null
   const latestError = latestMatchesSelection ? latestResult.error : ''
   const latestLoading = Boolean(latestKey && !latestMatchesSelection)
@@ -382,7 +393,7 @@ function Dashboard() {
               <p className="data-freshness-note">
                 {latestLoading ? 'Loading latest stored reading…'
                   : latestError ? 'Latest reading unavailable'
-                    : latestReading ? `Latest stored sample · ${formatTimestamp(latestReading.recordedAt)}`
+                    : latestReading ? `Latest stored ${latestReading.dataSource === 'simulation' ? 'simulation' : 'device'} sample · ${formatTimestamp(latestReading.recordedAt)}`
                       : 'No readings have been stored'}
               </p>
             </div>
@@ -409,6 +420,8 @@ function Dashboard() {
                 <p className="section-description">Charts show actual stored measurements. Missing values remain gaps.</p>
               </div>
               <div className="range-control">
+                <label htmlFor="reading-source">Reading source</label>
+                <select id="reading-source" value={dataSource} onChange={(event) => setDataSource(event.target.value)}><option value="">All sources</option><option value="real">Device readings</option><option value="simulation">Simulation</option></select>
                 <label htmlFor="date-range">Date range</label>
                 <select id="date-range" value={preset} onChange={(event) => setPreset(event.target.value)}>
                   <option value="24h">Last 24 hours</option>
@@ -440,6 +453,7 @@ function Dashboard() {
               </>
             )}
           </section>
+          <SimulationPanel waterBodyId={selectedWaterBodyId} />
         </>
       )}
     </section>

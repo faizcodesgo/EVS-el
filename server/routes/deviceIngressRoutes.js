@@ -13,7 +13,7 @@ router.post('/heartbeat', authenticateDevice, (req, res) => {
   })
 })
 
-// Telemetry is validated and acknowledged but is not persisted in this feature.
+// Telemetry is validated, persisted and evaluated against the water body's configured limits.
 router.post('/telemetry', authenticateDevice, receiveTelemetry)
 
 module.exports = router

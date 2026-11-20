@@ -1,10 +1,26 @@
 
 const WaterBody = require('../models/WaterBody')
+const { validateMonitoringLimits } = require('../services/monitoringLimits')
+
+function limitsFromRequest(body) {
+  if (!Object.prototype.hasOwnProperty.call(body, 'monitoringLimits')) return { supplied: false }
+  const result = validateMonitoringLimits(body.monitoringLimits)
+  return { supplied: true, value: result.value, errors: result.errors }
+}
+
+function sendLimitValidationError(res, errors) {
+  return res.status(400).json({
+    success: false,
+    message: 'Monitoring limits are invalid',
+    errors
+  })
+}
 
 // Add a water body
 async function createWaterBody(req, res) {
   try {
     const { name, location, waterType } = req.body
+    const limitResult = limitsFromRequest(req.body)
 
     if (!name || !waterType) {
       return res.status(400).json({
@@ -13,12 +29,19 @@ async function createWaterBody(req, res) {
       })
     }
 
-    const waterBody = await WaterBody.create({
+    if (limitResult.errors?.length) return sendLimitValidationError(res, limitResult.errors)
+
+    const waterBodyData = {
       userId: req.userId,
       name,
       location,
       waterType
-    })
+    }
+    if (limitResult.supplied && limitResult.value) {
+      waterBodyData.monitoringLimits = limitResult.value
+      waterBodyData.monitoringLimitsVersion = 1
+    }
+    const waterBody = await WaterBody.create(waterBodyData)
 
     return res.status(201).json({
       success: true,
@@ -58,6 +81,7 @@ async function getWaterBodies(req, res) {
 async function updateWaterBody(req, res) {
   try {
     const { name, location, waterType } = req.body
+    const limitResult = limitsFromRequest(req.body)
 
     if (!name || !name.trim() || !waterType) {
       return res.status(400).json({
@@ -65,17 +89,24 @@ async function updateWaterBody(req, res) {
         message: 'Name and water type are required'
       })
     }
+    if (limitResult.errors?.length) return sendLimitValidationError(res, limitResult.errors)
+
+    const update = {
+      name: name.trim(),
+      location: location?.trim() || '',
+      waterType
+    }
+    if (limitResult.supplied) {
+      update.monitoringLimits = limitResult.value
+      update.$inc = { monitoringLimitsVersion: 1 }
+    }
 
     const waterBody = await WaterBody.findOneAndUpdate(
       {
         _id: req.params.id,
         userId: req.userId
       },
-      {
-        name: name.trim(),
-        location: location?.trim() || '',
-        waterType
-      },
+      update,
       {
         new: true,
         runValidators: true
@@ -100,6 +131,28 @@ async function updateWaterBody(req, res) {
       success: false,
       message: 'Could not update water body'
     })
+  }
+}
+
+async function updateMonitoringLimits(req, res) {
+  const limitResult = validateMonitoringLimits(req.body?.monitoringLimits)
+  if (limitResult.errors.length) return sendLimitValidationError(res, limitResult.errors)
+
+  try {
+    const waterBody = await WaterBody.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      {
+        $set: { monitoringLimits: limitResult.value },
+        $inc: { monitoringLimitsVersion: 1 }
+      },
+      { new: true, runValidators: true }
+    )
+    if (!waterBody) {
+      return res.status(404).json({ success: false, message: 'Water body not found' })
+    }
+    return res.json({ success: true, waterBody })
+  } catch {
+    return res.status(500).json({ success: false, message: 'Could not update monitoring limits' })
   }
 }
 
@@ -135,5 +188,6 @@ module.exports = {
   createWaterBody,
   getWaterBodies,
   updateWaterBody,
+  updateMonitoringLimits,
   deleteWaterBody
 }

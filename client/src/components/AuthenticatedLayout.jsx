@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Activity,
+  Bell,
   Cpu,
   Info,
   Menu,
@@ -16,6 +17,7 @@ const navigation = [
   { label: 'My Water Bodies', to: '/water-bodies', icon: Waves },
   { label: 'Register Water Body', to: '/water-bodies/register', icon: PlusSquare },
   { label: 'Register Device', to: '/devices/register', icon: Cpu },
+  { label: 'Alerts', to: '/alerts', icon: Bell },
   { label: 'About Us', to: '/about', icon: Info }
 ]
 

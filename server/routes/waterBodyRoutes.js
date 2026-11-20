@@ -4,6 +4,7 @@ const {
   createWaterBody,
   getWaterBodies,
   updateWaterBody,
+  updateMonitoringLimits,
   deleteWaterBody
 } = require('../controllers/waterBodyController')
 
@@ -22,6 +23,7 @@ router.get('/', getWaterBodies)
 
 // Update a water body
 router.put('/:id', updateWaterBody)
+router.put('/:id/monitoring-limits', updateMonitoringLimits)
 
 // Delete a water body
 router.delete('/:id', deleteWaterBody)
