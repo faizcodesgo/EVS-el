@@ -1,17 +1,20 @@
-* {
-  box-sizing: border-box;
-}
+ @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 
-html,
-body,
-#root {
-  width: 100%;
-  min-height: 100%;
-  margin: 0;
-}
+ * {
+   box-sizing: border-box;
+ }
 
-body {
-  min-width: 320px;
-  min-height: 100vh;
-  background: #F5F6F2;
-}
+ html,
+ body,
+ #root {
+   width: 100%;
+   min-height: 100%;
+   margin: 0;
+ }
+
+ body {
+   min-width: 320px;
+   min-height: 100vh;
+   background: #10251F;
+   color: #F4F8F5;
+ }
