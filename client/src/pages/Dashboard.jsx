@@ -17,10 +17,10 @@ const PAGE_LIMIT = 100
 const EMPTY_READINGS = []
 
 const parameters = [
-  { key: 'temperature', name: 'Temperature', unit: '°C' },
-  { key: 'pH', name: 'pH', unit: '' },
-  { key: 'salinity', name: 'Salinity', unit: '' },
-  { key: 'ammonia', name: 'Ammonia', unit: 'mg/L', qualifier: 'TAN-N' }
+  { key: 'temperature', name: 'Temperature', unit: '°C', color: '#43A987' },
+  { key: 'pH', name: 'pH', unit: '', color: '#246B59' },
+  { key: 'salinity', name: 'Salinity', unit: '', color: '#39BFC8' },
+  { key: 'ammonia', name: 'Ammonia', unit: 'mg/L', qualifier: 'TAN-N', color: '#39BFC8' }
 ]
 
 function localDateValue(date) {
@@ -72,7 +72,7 @@ function MetricCard({ parameter, reading, readings }) {
     .filter((value) => typeof value === 'number' && Number.isFinite(value))
 
   return (
-    <article className="metric-card">
+    <article className="metric-card" style={{ '--metric-accent': parameter.color }}>
       <div className="metric-card-heading">
         <div>
           <h3>{parameter.name}</h3>
@@ -92,7 +92,7 @@ function MetricCard({ parameter, reading, readings }) {
         <div className="metric-sparkline" role="img" aria-label={`${parameter.name} trend from actual readings`}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={readings}>
-              <Line type="monotone" dataKey={parameter.key} stroke="#062F20" strokeWidth={1.6} dot={false} connectNulls={false} />
+              <Line type="monotone" dataKey={parameter.key} stroke={parameter.color} strokeWidth={1.8} dot={false} connectNulls={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -131,21 +131,21 @@ function ParameterChart({ parameter, data }) {
       <div className="chart-plot">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 12, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid stroke="#E5E9E2" vertical={false} />
+            <CartesianGrid stroke="#DDF5EA" vertical={false} />
             <XAxis
               dataKey="timestamp"
               type="number"
               scale="time"
               domain={['dataMin', 'dataMax']}
               tickFormatter={formatChartTime}
-              tick={{ fill: '#68756C', fontSize: 10 }}
-              axisLine={{ stroke: '#E5E9E2' }}
+              tick={{ fill: '#668078', fontSize: 10 }}
+              axisLine={{ stroke: '#A3DCC5' }}
               tickLine={false}
               minTickGap={24}
             />
             <YAxis
               width={48}
-              tick={{ fill: '#68756C', fontSize: 10 }}
+              tick={{ fill: '#668078', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               domain={['auto', 'auto']}
@@ -153,16 +153,18 @@ function ParameterChart({ parameter, data }) {
             <Tooltip
               labelFormatter={(value) => formatTimestamp(value)}
               formatter={(value) => [`${value}${parameter.unit ? ` ${parameter.unit}` : ''}`, parameter.name]}
-              contentStyle={{ border: '1px solid #E5E9E2', borderRadius: 0, color: '#24332B' }}
+              contentStyle={{ background: '#FFFFFF', border: '1px solid #A3DCC5', borderRadius: 10, color: '#173B35' }}
+              labelStyle={{ color: '#668078' }}
+              itemStyle={{ color: '#173B35' }}
             />
             <Line
               type="monotone"
               dataKey={parameter.key}
               name={parameter.name}
-              stroke="#062F20"
-              strokeWidth={2}
-              dot={data.length < 2 ? { r: 3, fill: '#062F20' } : false}
-              activeDot={{ r: 4, fill: '#062F20' }}
+              stroke={parameter.color}
+              strokeWidth={2.2}
+              dot={data.length < 2 ? { r: 3, fill: parameter.color } : false}
+              activeDot={{ r: 5, fill: parameter.color, stroke: '#FFFFFF' }}
               connectNulls={false}
             />
           </LineChart>
@@ -348,7 +350,7 @@ function Dashboard() {
 
   return (
     <section className="page-stack monitoring-page">
-      <div className="monitoring-context content-panel">
+      <div className="monitoring-context content-panel dashboard-hero">
         <div className="monitoring-context-title">
           <p className="section-kicker">SELECTED WATER BODY</p>
           {directoryLoading ? <p className="inline-state">Loading water bodies…</p>
@@ -359,20 +361,22 @@ function Dashboard() {
                   <p>{selectedWaterBody?.location || 'Location not specified'}{selectedWaterBody?.waterType ? ` · ${selectedWaterBody.waterType}` : ''}</p>
                 </>}
         </div>
-        <label className="field-group monitoring-selector">
-          <span>Water body</span>
-          <select value={selectedWaterBodyId} onChange={handleWaterBodyChange} disabled={directoryLoading || waterBodies.length === 0}>
-            {waterBodies.length === 0 && <option value="">No water bodies available</option>}
-            {waterBodies.map((body) => <option key={body._id} value={body._id}>{body.name}</option>)}
-          </select>
-        </label>
-        <div className="context-device">
-          <span className="context-device-label">ASSIGNED GLOB</span>
-          {deviceError ? <span className="inline-error">{deviceError}</span>
-            : assignedDevice ? <>
-              <strong>{assignedDevice.deviceId}</strong>
-              <span className={`status-label status-${assignedDevice.status}`}><span className="status-dot" />{assignedDevice.status === 'online' ? 'Online' : 'Offline'}</span>
-            </> : <span>{directoryLoading ? 'Loading device…' : 'No device assigned'}</span>}
+        <div className="hero-controls">
+          <label className="field-group monitoring-selector">
+            <span>Water body</span>
+            <select value={selectedWaterBodyId} onChange={handleWaterBodyChange} disabled={directoryLoading || waterBodies.length === 0}>
+              {waterBodies.length === 0 && <option value="">No water bodies available</option>}
+              {waterBodies.map((body) => <option key={body._id} value={body._id}>{body.name}</option>)}
+            </select>
+          </label>
+          <div className="context-device">
+            <span className="context-device-label">ASSIGNED GLOB</span>
+            {deviceError ? <span className="inline-error">{deviceError}</span>
+              : assignedDevice ? <>
+                <strong>{assignedDevice.deviceId}</strong>
+                <span className={`status-label status-${assignedDevice.status}`}><span className="status-dot" />{assignedDevice.status === 'online' ? 'Online' : 'Offline'}</span>
+              </> : <span>{directoryLoading ? 'Loading device…' : 'No device assigned'}</span>}
+          </div>
         </div>
       </div>
 
