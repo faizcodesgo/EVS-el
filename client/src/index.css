@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
 * {
   box-sizing: border-box;
 }
@@ -13,5 +15,6 @@ body,
 body {
   min-width: 320px;
   min-height: 100vh;
-  background: #F5F6F2;
+  background: #F5FBF8;
+  color: #173B35;
 }
